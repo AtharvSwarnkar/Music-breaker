@@ -5,5 +5,5 @@ from app.core.config import UPLOADS_DIR
 separator = DemucsSeparator()
 
 separator.separate(
-    str(UPLOADS_DIR / "beliver.mp3")
+    str(UPLOADS_DIR / "yung.mp3")
 )

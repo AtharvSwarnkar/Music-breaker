@@ -1,0 +1,66 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+backend/venv/
+venv/
+
+# Environment Variables
+.env
+
+# VS Code
+.vscode/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Python Cache
+.pytest_cache/
+.mypy_cache/
+
+# =========================
+# ML Models & Cache
+# =========================
+.cache/
+.huggingface/
+torch_cache/
+*.pth
+*.pt
+*.ckpt
+*.bin
+
+# =========================
+# Generated Audio
+# =========================
+backend/app/temp/
+backend/app/uploads/
+
+# Ignore generated wav files
+*.wav
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Build
+# =========================
+dist/
+build/
+
+# =========================
+# IDE
+# =========================
+.idea/
