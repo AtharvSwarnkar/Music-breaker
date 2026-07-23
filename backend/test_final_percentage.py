@@ -15,7 +15,7 @@ TEMPERATURE = 0.1
 analyzer = SongAnalyzer()
 
 analysis = analyzer.analyze(
-    r"D:\MusicAI\backend\app\temp\htdemucs\attention\other.wav"
+    r"D:\MusicAI\backend\app\temp\htdemucs\beliver\other.wav"
 )
 
 calculator = PercentageCalculator(analysis)
@@ -33,11 +33,11 @@ stem = StemAnalysis()
 
 stem_distribution = stem.analyze(
 
-    r"D:\MusicAI\backend\app\temp\htdemucs\attention\other.wav",
+    r"D:\MusicAI\backend\app\temp\htdemucs\beliver\other.wav",
 
-    r"D:\MusicAI\backend\app\temp\htdemucs\attention\bass.wav",
+    r"D:\MusicAI\backend\app\temp\htdemucs\beliver\bass.wav",
 
-    r"D:\MusicAI\backend\app\temp\htdemucs\attention\drums.wav"
+    r"D:\MusicAI\backend\app\temp\htdemucs\beliver\drums.wav"
 )
 
 # -------------------------
