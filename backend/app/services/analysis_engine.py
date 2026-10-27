@@ -1,115 +1,123 @@
+
+"""Aggregate CLAP instrument scores across an entire song."""
+
+from __future__ import annotations
+
+
 class AnalysisEngine:
-
     def __init__(self, analysis):
-        self.analysis = analysis
+        self.analysis = analysis or []
 
-    # --------------------------------------------------
-    # Normalize scores for every window
-    # --------------------------------------------------
     def normalize_scores(self):
-
+        """Validate and bound each window's independent match scores."""
         normalized = []
 
         for window in self.analysis:
+            scores = window.get("scores", {})
 
-            scores = window["scores"]
-
-            total = sum(max(score, 0.0) for score in scores.values())
-
-            if total == 0:
-                total = 1
-
-            normalized_scores = {}
-
-            for instrument, score in scores.items():
-
-                normalized_scores[instrument] = max(score, 0.0) / total
+            clean = {
+                key: max(0.0, min(1.0, float(value)))
+                for key, value in scores.items()
+            }
 
             normalized.append({
-                "window": window["window"],
-                "start_time": window["start_time"],
-                "end_time": window["end_time"],
-                "scores": normalized_scores
+                "window": int(window.get("window", len(normalized))),
+                "start_time": float(
+                    window.get("start_time", len(normalized))
+                ),
+                "end_time": float(
+                    window.get("end_time", len(normalized) + 1)
+                ),
+                "scores": clean,
             })
 
         return normalized
 
-    # --------------------------------------------------
-    # Timeline
-    # --------------------------------------------------
     def get_timelines(self):
-
-        normalized = self.normalize_scores()
-
+        """Return per-window scores for timeline visualizations."""
         timelines = {}
 
-        for window in normalized:
-
+        for window in self.normalize_scores():
             for instrument, score in window["scores"].items():
-
-                if instrument not in timelines:
-                    timelines[instrument] = []
-
-                timelines[instrument].append(score)
+                timelines.setdefault(instrument, []).append(score)
 
         return timelines
 
-    # --------------------------------------------------
-    # Presence
-    # --------------------------------------------------
-    def get_presence(self, threshold=0.15):
+    def get_song_level_scores(self):
+        """
+        Calculate one overall score per instrument for the whole song.
 
-        normalized = self.normalize_scores()
+        Formula:
+            song_score = mean(window_scores) * 100
 
-        presence = {}
+        The result is an adjusted match index, not a probability,
+        calibrated confidence, loudness measurement, or mix contribution.
+        """
+        windows = self.normalize_scores()
 
-        total_windows = len(normalized)
+        if not windows:
+            return {}
 
-        for instrument in normalized[0]["scores"]:
+        instruments = windows[0]["scores"].keys()
+        total_windows = len(windows)
+        song_scores = {}
 
-            active = 0
-
-            for window in normalized:
-
-                if window["scores"][instrument] >= threshold:
-                    active += 1
-
-            presence[instrument] = round(
-                active * 100 / total_windows,
-                2
+        for instrument in instruments:
+            score_sum = sum(
+                window["scores"].get(instrument, 0.0)
+                for window in windows
             )
 
-        return presence
+            mean_score = score_sum / total_windows
+            song_scores[instrument] = round(mean_score * 100, 2)
 
-    # --------------------------------------------------
-    # Contribution
-    # --------------------------------------------------
-    def get_contribution(self):
-
-        normalized = self.normalize_scores()
-
-        contribution = {}
-
-        total_windows = len(normalized)
-
-        for instrument in normalized[0]["scores"]:
-
-            total = 0
-
-            for window in normalized:
-
-                total += window["scores"][instrument]
-
-            contribution[instrument] = total / total_windows
-
-        contribution = dict(
+        return dict(
             sorted(
-                contribution.items(),
-                key=lambda x: x[1],
-                reverse=True
+                song_scores.items(),
+                key=lambda item: item[1],
+                reverse=True,
             )
         )
 
-        return contribution
-    
+    def get_window_coverage(self):
+        """
+        Percentage of windows where an instrument passed the detector's
+        existing match thresholds and received a non-zero score.
 
+        This is evidence coverage, not a calibrated probability of presence.
+        """
+        windows = self.normalize_scores()
+
+        if not windows:
+            return {}
+
+        instruments = windows[0]["scores"].keys()
+        total_windows = len(windows)
+        coverage = {}
+
+        for instrument in instruments:
+            matched_windows = sum(
+                window["scores"].get(instrument, 0.0) > 0.0
+                for window in windows
+            )
+
+            coverage[instrument] = round(
+                100 * matched_windows / total_windows,
+                2,
+            )
+
+        return dict(
+            sorted(
+                coverage.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        )
+
+    def get_presence(self):
+        """Backward-compatible alias for window evidence coverage."""
+        return self.get_window_coverage()
+
+    def get_contribution(self):
+        """Backward-compatible alias; values are now song-level scores."""
+        return self.get_song_level_scores()

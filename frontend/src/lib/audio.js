@@ -19,56 +19,252 @@ export async function makeWaveform(file, samples = 900) {
     return { values, duration: buffer.duration }
   } finally { await ctx.close() }
 }
+
 export function normalizeAnalysis(raw, duration = 0) {
-  // Accepts: {windows:[{time, instruments:{Drums: .8}}]}, arrays of window records,
-  // {analysis:[...]}, {instrument_percentages:{...}}, or {instruments:{...}}.
-  const windows = Array.isArray(raw) ? raw : raw?.windows || raw?.analysis || raw?.results || raw?.frames || []
-  const instrumentMap = new Map()
+  const windows = Array.isArray(raw)
+    ? raw
+    : raw?.windows ||
+      raw?.analysis ||
+      raw?.results ||
+      raw?.frames ||
+      [];
+
+  const instrumentMap = new Map();
+
   const rows = windows.map((item, index) => {
-    const time = Number(item.time ?? item.timestamp ?? item.start ?? index)
-    let values = item.instruments || item.scores || item.predictions || item.detected_instruments || item
-    if (Array.isArray(values)) values = Object.fromEntries(values.map(v => Array.isArray(v) ? [v[0], v[1]] : [v.instrument || v.label || v.name, v.score ?? v.value ?? v.confidence]))
-    const clean = {}
-    Object.entries(values || {}).forEach(([key, value]) => {
-      if (['time','timestamp','start','end','duration','index','window'].includes(key)) return
-      const score = typeof value === 'object' && value !== null ? Number(value.score ?? value.value ?? value.confidence ?? 0) : Number(value)
-      if (Number.isFinite(score) && score > 0) { clean[key] = score; instrumentMap.set(key, true) }
-    })
-    return { time, ...clean }
-  })
-  if (!rows.length) {
-    const summary = raw?.instrument_percentages || raw?.instruments || raw?.instrument_contribution || raw?.percentages || {}
-    const entries = Object.entries(summary).filter(([,v]) => Number(v) > 0)
-    entries.forEach(([k]) => instrumentMap.set(k, true))
-    if (entries.length) rows.push({ time: 0, ...Object.fromEntries(entries.map(([k,v]) => [k, Number(v)])) })
-  }
-  // Convert percentages/fractions into a consistent 0–1 chart scale per instrument.
-  const keys = [...instrumentMap.keys()].filter(k => rows.some(r => Number(r[k]) > 0))
-  const maxes = Object.fromEntries(keys.map(k => [k, Math.max(...rows.map(r => Number(r[k] || 0)))]))
-  const normalized = rows.map((r, i) => {
-    const out = { second: Math.max(0, Math.round(Number.isFinite(r.time) ? r.time : i)) }
-    keys.forEach(k => {
-      const v = Number(r[k] || 0), max = maxes[k] || 1
-      out[k] = v > 1 ? v / 100 : (max > 0 && max <= 1 ? v : v / max)
-    })
-    return out
-  })
-  // Make one point per second. Duplicate timestamps are averaged; missing seconds remain zero.
-  const bySecond = new Map()
-  normalized.forEach(r => {
-    const s = r.second
-    if (!bySecond.has(s)) bySecond.set(s, { second: s, count: 0, ...Object.fromEntries(keys.map(k => [k, 0])) })
-    const dest = bySecond.get(s); dest.count++
-    keys.forEach(k => dest[k] += r[k] || 0)
-  })
-  let points = [...bySecond.values()].sort((a,b) => a.second-b.second).map(r => ({ second: r.second, ...Object.fromEntries(keys.map(k => [k, r[k] / r.count])) }))
-  if (points.length > 1) {
-    const filled = []
-    for (let s = points[0].second; s <= points[points.length-1].second; s++) {
-      const exact = points.find(p => p.second === s)
-      filled.push(exact || { second: s, ...Object.fromEntries(keys.map(k => [k, 0])) })
+    const time = Number(
+      item.time ?? item.timestamp ?? item.start ?? index
+    );
+
+    let values =
+      item.instruments ||
+      item.scores ||
+      item.predictions ||
+      item.detected_instruments ||
+      item;
+
+    if (Array.isArray(values)) {
+      values = Object.fromEntries(
+        values.map((v) =>
+          Array.isArray(v)
+            ? [v[0], v[1]]
+            : [
+                v.instrument || v.label || v.name,
+                v.score ?? v.value ?? v.confidence,
+              ]
+        )
+      );
     }
-    points = filled
+
+    const clean = {};
+
+    Object.entries(values || {}).forEach(([key, value]) => {
+      if (
+        [
+          "time",
+          "timestamp",
+          "start",
+          "end",
+          "duration",
+          "index",
+          "window",
+        ].includes(key)
+      ) {
+        return;
+      }
+
+      const score =
+        typeof value === "object" && value !== null
+          ? Number(
+              value.score ??
+                value.value ??
+                value.confidence ??
+                0
+            )
+          : Number(value);
+
+      if (Number.isFinite(score) && score > 0) {
+        clean[key] = score;
+        instrumentMap.set(key, true);
+      }
+    });
+
+    return { time, ...clean };
+  });
+
+  // Support responses containing only song-level instrument scores.
+  if (!rows.length) {
+    const summary =
+      raw?.song_level_scores ||
+      raw?.instrument_percentages ||
+      raw?.instruments ||
+      raw?.instrument_contribution ||
+      raw?.contribution ||
+      raw?.final_percentages ||
+      raw?.percentages ||
+      {};
+
+    const entries = Object.entries(summary).filter(
+      ([, value]) => {
+        const score =
+          typeof value === "object" && value !== null
+            ? Number(
+                value.score ??
+                  value.value ??
+                  value.confidence ??
+                  0
+              )
+            : Number(value);
+
+        return Number.isFinite(score) && score > 0;
+      }
+    );
+
+    entries.forEach(([key]) => instrumentMap.set(key, true));
+
+    if (entries.length) {
+      rows.push({
+        time: 0,
+        ...Object.fromEntries(
+          entries.map(([key, value]) => {
+            const score =
+              typeof value === "object" && value !== null
+                ? Number(
+                    value.score ??
+                      value.value ??
+                      value.confidence ??
+                      0
+                  )
+                : Number(value);
+
+            return [key, score];
+          })
+        ),
+      });
+    }
   }
-  return { points, instruments: keys, summary: raw?.instrument_percentages || raw?.final_percentages || raw?.percentages || {}, metadata: raw?.metadata || raw?.song || {}, duration: Number(raw?.duration || raw?.duration_seconds || duration || 0), raw }
+
+  const keys = [...instrumentMap.keys()].filter((key) =>
+    rows.some((row) => Number(row[key]) > 0)
+  );
+
+  const maxes = Object.fromEntries(
+    keys.map((key) => [
+      key,
+      Math.max(...rows.map((row) => Number(row[key] || 0))),
+    ])
+  );
+
+  // Normalize window scores to a 0–1 scale.
+  const normalized = rows.map((row, index) => {
+    const result = {
+      second: Math.max(
+        0,
+        Math.round(
+          Number.isFinite(row.time) ? row.time : index
+        )
+      ),
+    };
+
+    keys.forEach((key) => {
+      const value = Number(row[key] || 0);
+      const max = maxes[key] || 1;
+
+      result[key] =
+        value > 1
+          ? value / 100
+          : max > 0 && max <= 1
+            ? value
+            : value / max;
+    });
+
+    return result;
+  });
+
+  // Average records with duplicate timestamps.
+  const bySecond = new Map();
+
+  normalized.forEach((row) => {
+    const second = row.second;
+
+    if (!bySecond.has(second)) {
+      bySecond.set(second, {
+        second,
+        count: 0,
+        ...Object.fromEntries(keys.map((key) => [key, 0])),
+      });
+    }
+
+    const destination = bySecond.get(second);
+    destination.count++;
+
+    keys.forEach((key) => {
+      destination[key] += row[key] || 0;
+    });
+  });
+
+  let points = [...bySecond.values()]
+    .sort((a, b) => a.second - b.second)
+    .map((row) => ({
+      second: row.second,
+      ...Object.fromEntries(
+        keys.map((key) => [
+          key,
+          row[key] / row.count,
+        ])
+      ),
+    }));
+
+  // Fill missing seconds with zero-valued records.
+  if (points.length > 1) {
+    const filled = [];
+
+    for (
+      let second = points[0].second;
+      second <= points[points.length - 1].second;
+      second++
+    ) {
+      const exact = points.find(
+        (point) => point.second === second
+      );
+
+      filled.push(
+        exact ||
+          {
+            second,
+            ...Object.fromEntries(
+              keys.map((key) => [key, 0])
+            ),
+          }
+      );
+    }
+
+    points = filled;
+  }
+
+  // Prefer the backend's song-level aggregate for the overview.
+  const summary =
+    raw?.song_level_scores ||
+    raw?.instrument_contribution ||
+    raw?.contribution ||
+    raw?.instrument_percentages ||
+    raw?.final_percentages ||
+    raw?.percentages ||
+    {};
+
+  return {
+    points,
+    instruments: keys,
+    summary,
+    metadata: raw?.metadata || raw?.song || {},
+    duration: Number(
+      raw?.duration ||
+        raw?.duration_seconds ||
+        duration ||
+        0
+    ),
+    raw,
+  };
 }
+
+
