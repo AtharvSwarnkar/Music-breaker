@@ -41,6 +41,7 @@ torch_cache/
 backend/app/temp/
 backend/app/uploads/
 backend/app/datasets/
+datasets
 
 # Ignore generated wav files
 *.wav
