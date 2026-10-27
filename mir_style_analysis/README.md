@@ -30,6 +30,20 @@ python -m app.ingest path\to\reference.wav --title "Track" --artist "Artist" --a
 
 This writes `data/catalogue.json`. The stable ID is derived from audio content; re-ingestion updates it. Set `MIR_CATALOGUE_PATH` for a different persistence location.
 
+For a whole folder, use the batch command. It recursively supports MP3, WAV, and FLAC, skips duplicate audio content, and continues past files that fail decoding:
+
+```powershell
+python -m app.ingest_folder "D:\Music\references" --recursive
+```
+
+Use filenames such as `Artist - Title.mp3` for automatic metadata. For files without that naming convention, supply a fallback artist:
+
+```powershell
+python -m app.ingest_folder "D:\Music\references" --recursive --artist-default "Various Artists"
+```
+
+Preview metadata without changing the catalogue using `--dry-run`. The command prints a JSON summary with counts and individual failures.
+
 ## Feature schema and semantics
 
 `TrackFeatures` is schema `1.0.0` / feature pipeline `librosa-heuristic-1.0.0`. It stores duration (s), BPM, key/mode, categorical labels, instrument spectral-evidence indices, and named numeric features: beat count, harmonic/percussive ratios, MFCC means, spectral centroid/rolloff/bandwidth/flatness, zero-crossing rate, RMS dB, and dynamic range dB. Missing values are `null`; no missing values are silently replaced for ranking.
