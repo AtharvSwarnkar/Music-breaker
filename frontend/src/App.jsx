@@ -164,6 +164,11 @@ export default function App() {
   const inputRef = useRef(null)
 
   const view = analysis || demoAnalysis;
+  const mir = analysis?.raw?.mir || null;
+  const mirFeatures = mir?.features || null;
+  const mirMeasurements = mirFeatures
+    ? Object.entries(mirFeatures.numeric || {})
+    : [];
   const instruments = view.instruments || [];
   const summary = view.summary || {};
   const points = Array.isArray(view.points) ? view.points : [];
@@ -781,6 +786,64 @@ export default function App() {
             of the song's total sound.
           </small>
         </section>
+
+        {mir && mirFeatures && (
+          <>
+            <div className="section-heading">
+              <div>
+                <div className="section-kicker">04 / MUSIC INTELLIGENCE</div>
+                <h2>Musical characteristics & similarity</h2>
+                <p>Measured audio features and retrieved-song evidence.</p>
+              </div>
+              <span className="small-chip">MIR v{mirFeatures.schema_version}</span>
+            </div>
+
+            <section className="mir-grid">
+              <article className="glass mir-card">
+                <div className="section-kicker">MEASURED / HEURISTIC</div>
+                <h3>Track profile</h3>
+                <dl className="mir-details">
+                  <div><dt>Genre</dt><dd>{prettyName(mirFeatures.genre || 'unknown')} <small>{mirFeatures.genre_method}</small></dd></div>
+                  <div><dt>Mood</dt><dd>{prettyName(mirFeatures.mood || 'unavailable')} <small>{mirFeatures.mood_method}</small></dd></div>
+                  <div><dt>Tempo</dt><dd>{mirFeatures.bpm ? `${mirFeatures.bpm} BPM` : 'Unavailable'}</dd></div>
+                  <div><dt>Key</dt><dd>{[mirFeatures.key, mirFeatures.mode].filter(Boolean).join(' ') || 'Unavailable'}</dd></div>
+                  <div><dt>Duration</dt><dd>{formatTime(mirFeatures.duration_seconds)}</dd></div>
+                </dl>
+                <h4>Instrument spectral evidence</h4>
+                <div className="mir-tags">
+                  {Object.entries(mirFeatures.instruments || {}).map(([name, value]) => (
+                    <span key={name}>{prettyName(name)} · {value}</span>
+                  ))}
+                </div>
+              </article>
+
+              <article className="glass mir-card">
+                <div className="section-kicker">RETRIEVED-SONG EVIDENCE</div>
+                <h3>Artist-style inference</h3>
+                <p className="mir-artist">{mir.artist_style_inference?.artist || 'Insufficient evidence'}</p>
+                <p className="insight-intro">{mir.artist_style_inference?.disclaimer || mir.artist_style_inference?.reason}</p>
+                <h4>Similar reference songs</h4>
+                {mir.similar_songs?.length ? (
+                  <ol className="mir-list">
+                    {mir.similar_songs.map((song) => (
+                      <li key={song.track_id}><strong>{song.title}</strong> <span>— {song.artist}</span><small>Similarity index {(song.similarity_index * 100).toFixed(1)}</small></li>
+                    ))}
+                  </ol>
+                ) : <p className="insight-intro">No reference songs are ingested yet.</p>}
+              </article>
+            </section>
+
+            <section className="glass mir-card mir-wide">
+              <div className="section-kicker">WHY THIS RESULT</div>
+              <h3>Evidence, measurements & limitations</h3>
+              <div className="mir-three-columns">
+                <div><h4>Explanation</h4><ul className="mir-list">{mir.explanations?.map((line, i) => <li key={i}>{line}</li>)}</ul></div>
+                <div><h4>Measurements</h4><ul className="mir-list compact-list">{mirMeasurements.map(([name, value]) => <li key={name}><span>{prettyName(name)}</span><strong>{Number(value).toFixed(3)}</strong></li>)}</ul></div>
+                <div><h4>Limitations</h4><ul className="mir-list">{mir.limitations?.map((line, i) => <li key={i}>{line}</li>)}</ul></div>
+              </div>
+            </section>
+          </>
+        )}
 
         <footer>
           <div className="footer-brand">

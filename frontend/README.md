@@ -91,9 +91,29 @@ Best shape for second-level charts:
 - Export data downloads the raw backend JSON.
 - Demo data is explicitly labeled as preview and is replaced after a successful backend analysis.
 
-## Scope caveat
+## Integrated backend and MIR results
 
-Only the Python test scripts and project specification were supplied in this conversation; the actual FastAPI app, route definitions, dependency file, and backend source were not. The frontend is prepared to connect through a configurable API contract, but the final route/field name must be matched to the actual backend before end-to-end connectivity can be verified.
+The existing screen now consumes the complete `mir` object returned by the
+existing backend's `/api/analyze` route. Start both applications:
+
+```powershell
+# Terminal 1
+cd D:\MusicAI\backend
+.\venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
+
+# Terminal 2
+cd D:\MusicAI\frontend
+npm run dev
+```
+
+One upload now returns the legacy instrument fields plus MIR features,
+similar-song results, artist-style inference, explanations, and limitations.
+Reference tracks are shared with `mir_style_analysis/data/catalogue.json`; use
+the ingestion command in `D:\MusicAI\mir_style_analysis\README.md` to add
+rights-cleared tracks. The original Demucs/CLAP instrument path is optional;
+set `MUSICAI_ENABLE_LEGACY_PIPELINE=true` before starting the backend to enable
+it.
 
 
 ## Dominant instrument graph
